@@ -1,0 +1,78 @@
+version: '3'
+
+services:
+  prometheus:
+   image: prom/prometheus:latest
+   restart: unless-stopped
+   ports:
+     - 9090:9090
+   volumes:
+     - ./prometheus.yml:/etc/prometheus/prometheus.yml 
+     - ./rules.yml:/etc/prometheus/rules.yml
+ 
+  alertmanager:
+    image: prom/alertmanager:latest
+    restart: unless-stopped
+    ports:
+      - 9093:9093
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+
+  nodeexporter:
+    image: prom/node-exporter:latest
+    restart: unless-stopped
+    ports:
+      - 9100:9100
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+
+  grafana:
+   image: grafana/grafana:latest
+   restart: unless-stopped
+   ports:
+     - 3000:3000
+   volumes:
+     - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+     - grafana-data:/var/lib/grafana
+  
+  alerta:
+    image: alerta/alerta-web
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      - DEBUG=1  # remove this line to turn DEBUG off
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/monitoring
+      - AUTH_REQUIRED=True
+      - ADMIN_USERS=admin@alerta.io,devops@alerta.io #default password: alerta
+      - ADMIN_KEY=demo-key
+      - PLUGINS=reject,blackout,normalise,enhance
+    restart: always
+  db:
+    image: postgres
+    volumes:
+      - ./pg-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: monitoring
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    restart: always
+
+  prometheus-msteams:
+    image: docker.io/bzon/prometheus-msteams:latest
+    ports:
+      - 2000:2000
+    container_name: prometheus-msteams
+    restart: unless-stopped
+    volumes:
+        - ./msteams.yml:/etc/msteams/msteams.yml
+    environment:
+        - CONFIG_FILE=/etc/msteams/msteams.yml
+
+volumes:
+   grafana-data:
