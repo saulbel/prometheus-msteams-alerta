@@ -1,0 +1,42 @@
+global:
+  resolve_timeout: 1m
+
+route:
+  receiver: "alerta"
+  group_by: ['alertname']
+  group_wait:      15s
+  group_interval:  15s
+  repeat_interval: 1m
+  routes:
+    - receiver: 'alerta'
+      repeat_interval: 1m
+      continue: true
+    - receiver: high_priority_receiver
+      match:
+        severity: critical
+      continue: true
+    - receiver: low_priority_receiver
+      match:
+        severity: warning
+      continue: true
+
+receivers:
+- name: "alerta"
+  webhook_configs:
+  - url: 'http://alerta:8080/api/webhooks/prometheus'
+    send_resolved: true
+    http_config:
+      basic_auth: 
+        username: admin@alerta.io
+        password: alerta
+    
+- name: 'high_priority_receiver'
+  webhook_configs:
+    - send_resolved: true
+      url: 'http://prometheus-msteams:2000/high_priority_channel' # request handler 1
+
+- name: 'low_priority_receiver'
+  webhook_configs:
+    - send_resolved: true
+      url: 'http://prometheus-msteams:2000/low_priority_channel' # request handler 2
+
